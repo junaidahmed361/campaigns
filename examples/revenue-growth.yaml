@@ -1,0 +1,16 @@
+campaign:
+  objective: Increase recurring revenue by 30% for a local detailing business
+  domain: growth
+  budget:
+    dollars: 5000
+    human_hours: 20
+  timeline:
+    days: 90
+  metrics:
+    - recurring_revenue
+    - conversion_rate
+    - retention_rate
+  constraints:
+    - no cold email
+    - human approval for spend > $500
+    - disclose AI-generated customer-facing content before publishing
