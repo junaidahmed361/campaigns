@@ -1,5 +1,6 @@
 """Campaign operating-system primitives powered by AgentRL pod declarations."""
 
+from .autorun import AutorunPolicy, AutorunResult, CampaignAutorun, CampaignIteration
 from .models import (
     AgentHarnessDefinition,
     AgentRLPodInstantiation,
@@ -19,6 +20,10 @@ from .models import (
 from .compiler import CampaignCompiler
 
 __all__ = [
+    "AutorunPolicy",
+    "AutorunResult",
+    "CampaignAutorun",
+    "CampaignIteration",
     "AgentHarnessDefinition",
     "AgentRLPodInstantiation",
     "Budget",

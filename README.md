@@ -160,10 +160,39 @@ print(dossier.to_dict()["workflow"])
 - `TraceMonitor`: user-monitorable trace surface for fleet performance reviews.
 - `PerformanceReview`: scorecard scaffold for reviewing employed agents without micromanagement.
 - `ReviewDossier`: final artifact the user reviews before approving execution, accepting outcomes, or triggering another iteration.
+- `CampaignAutorun`: simple `fit` / `transform` / `score` / `autorun` primitive for bounded observe-plan-act-verify-review loops.
+- `AutorunPolicy` and `CampaignIteration`: loop limits, stop conditions, and iteration records for Claude-style dynamic workflows.
 
 ## Boundary
 
-Campaigns does not implement agent runtimes, model training, or harness evolution. It records which AgentRL pod should own those lifecycle responsibilities and how the campaign organization composes them.
+Campaigns does not implement agent runtimes, model training, harness evaluation, harness evolution, or deployment. It records which AgentRL pod should own those lifecycle responsibilities and how the campaign organization composes them. AgentRL does not implement campaign autorun, campaign organizations, contracted-worker queues, performance-review dashboards, or marketing/business workflow policy; those belong in Campaigns.
+
+## Claude-style loop autorun
+
+Campaigns includes a simple scikit-learn-style autorun primitive for dynamic campaign workflows:
+
+```python
+from campaigns import CampaignAutorun
+
+runner = CampaignAutorun().fit(spec)
+dossier = runner.transform()
+readiness = runner.score()
+result = runner.autorun(max_loops=3)
+```
+
+The autorun loop is intentionally an operating plan, not an agent runtime:
+
+```text
+observe -> plan -> act -> verify -> review -> repeat until approval/stop/limit
+```
+
+It can select workflow steps dynamically across loops, preserve trace/review surfaces, and stop at ultimate user review. Runtime execution is delegated to agent systems; harness lifecycle feedback is handed to AgentRL.
+
+CLI:
+
+```bash
+campaigns autorun examples/revenue-growth.yaml --loops 3
+```
 
 ## Sister commercial app
 
