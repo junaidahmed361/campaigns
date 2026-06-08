@@ -71,9 +71,24 @@ class AutorunPolicy:
     """
 
     max_loops: int = 3
+    step_budget: int | None = None
     stop_when: tuple[str, ...] = ("objective_satisfied", "approval_required", "budget_exhausted", "human_stop")
     require_ultimate_review: bool = True
     dynamic_step_kinds: tuple[str, ...] = ("observe", "plan", "act", "verify", "review")
+    second_model_evaluator: str = "goal_satisfaction_check"
+    independent_final_auditor: str = "ultimate_review_auditor"
+    save_resume_state: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class GoalCheck:
+    question: str
+    met: bool
+    evaluator: str
+    rationale: str
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -88,6 +103,8 @@ class CampaignIteration:
     selected_steps: tuple[str, ...]
     stop_reason: str | None
     review_packet: tuple[str, ...]
+    goal_check: GoalCheck
+    audit: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -102,6 +119,7 @@ class AutorunResult:
     policy: AutorunPolicy
     iterations: tuple[CampaignIteration, ...]
     status: str
+    resume_state: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -154,11 +172,14 @@ class CampaignAutorun:
 
     def autorun(self, campaign: CampaignSpec | dict[str, Any] | None = None, max_loops: int | None = None) -> AutorunResult:
         dossier = self.transform(campaign)
-        loop_count = max_loops if max_loops is not None else self.policy.max_loops
+        requested_loops = max_loops if max_loops is not None else self.policy.max_loops
+        loop_count = min(requested_loops, self.policy.step_budget) if self.policy.step_budget else requested_loops
         iterations: list[CampaignIteration] = []
+        stop_reason: str | None = None
         for index in range(1, loop_count + 1):
             selected = self._select_dynamic_steps(dossier.workflow, index)
-            stop_reason = self._stop_reason(index, loop_count)
+            goal_check = self._goal_check(dossier, index)
+            stop_reason = self._stop_reason(index, requested_loops, goal_check)
             iterations.append(
                 CampaignIteration(
                     index=index,
@@ -166,13 +187,32 @@ class CampaignAutorun:
                     selected_steps=selected,
                     stop_reason=stop_reason,
                     review_packet=dossier.final_review_packet,
+                    goal_check=goal_check,
+                    audit=self.policy.independent_final_auditor if stop_reason in {"objective_satisfied", "approval_required"} else None,
                 )
             )
             if stop_reason:
                 break
+        if not stop_reason and loop_count < requested_loops:
+            stop_reason = "budget_exhausted"
+            if iterations:
+                last = iterations[-1]
+                iterations[-1] = CampaignIteration(
+                    index=last.index,
+                    phase=last.phase,
+                    selected_steps=last.selected_steps,
+                    stop_reason=stop_reason,
+                    review_packet=last.review_packet,
+                    goal_check=last.goal_check,
+                    audit=last.audit,
+                )
         self.iterations_ = tuple(iterations)
-        status = "awaiting_ultimate_review" if self.policy.require_ultimate_review else "completed"
-        return AutorunResult(self.campaign_, dossier, self.policy, self.iterations_, status)  # type: ignore[arg-type]
+        resume_state = self._resume_state(dossier, requested_loops, loop_count, stop_reason) if stop_reason == "budget_exhausted" else None
+        if stop_reason == "budget_exhausted":
+            status = "paused_budget_exhausted"
+        else:
+            status = "awaiting_ultimate_review" if self.policy.require_ultimate_review else "completed"
+        return AutorunResult(self.campaign_, dossier, self.policy, self.iterations_, status, resume_state)  # type: ignore[arg-type]
 
     def retro(self, feedback: RetrospectiveFeedback | dict[str, Any]) -> RetrospectiveResult:
         """Plan continual-learning reinforcement from a campaign retrospective.
@@ -197,6 +237,65 @@ class CampaignAutorun:
         )
         self.retrospectives_ = self.retrospectives_ + (result,)
         return result
+
+    def final_review(self, accepted: bool, feedback: str) -> RetrospectiveResult:
+        """Accept user final review, then let a retro agent traverse traces.
+
+        The user supplies the final judgment. After that, the campaign retro agent
+        owns trace traversal across all employed agents, attributes a root cause,
+        and emits AgentRL reinforcement for the responsible harness.
+        """
+
+        dossier = self.transform()
+        root_cause = self._trace_root_cause(feedback, dossier)
+        result = RetrospectiveResult(
+            feedback=RetrospectiveFeedback(
+                summary=feedback,
+                attention_level="agentrl",
+                target=root_cause["target"],
+                outcome="accepted" if accepted else "needs_improvement",
+                reinforce=f"Root cause: {root_cause['summary']}. Reinforce from final review: {feedback}",
+                evidence=tuple(root_cause["trace_paths"]),
+            ),
+            actions=(
+                ReinforcementAction(
+                    owner="agentrl",
+                    target=root_cause["target"],
+                    instruction=f"Root cause: {root_cause['summary']}. Reinforce from final review: {feedback}",
+                    reinforcement_targets=("evaluation", "memory", "prompts"),
+                    agentrl_project_path=root_cause.get("agentrl_project_path"),
+                ),
+            ),
+            status="self_reinforcement_planned",
+            context={"root_cause": root_cause, "accepted": accepted},
+        )
+        self.retrospectives_ = self.retrospectives_ + (result,)
+        return result
+
+    def _trace_root_cause(self, feedback: str, dossier: ReviewDossier) -> dict[str, Any]:
+        text = feedback.lower()
+        agents = [agent for team in dossier.organization.teams for agent in team.agents]
+        target_agent = None
+        for agent in agents:
+            if agent.name.lower() in text or agent.role.lower() in text:
+                target_agent = agent
+                break
+        if target_agent is None:
+            target_agent = agents[0] if agents else None
+        summary = "trace evidence gap"
+        if "competitor" in text and "pricing" in text:
+            summary = "competitor pricing evidence gap"
+        elif "evidence" in text or "citation" in text:
+            summary = "evidence citation gap"
+        elif "metric" in text or "analytics" in text:
+            summary = "measurement quality gap"
+        return {
+            "target": target_agent.name if target_agent else "campaign",
+            "summary": summary,
+            "trace_paths": dossier.trace_monitor.trace_paths,
+            "agentrl_project_path": target_agent.pod.project_path if target_agent else None,
+            "traversed_agents": tuple(agent.name for agent in agents),
+        }
 
     def _retro_action(self, feedback: RetrospectiveFeedback, dossier: ReviewDossier) -> ReinforcementAction:
         instruction = feedback.reinforce or feedback.summary
@@ -225,6 +324,32 @@ class CampaignAutorun:
                     return agent
         return None
 
+    def _goal_check(self, dossier: ReviewDossier, index: int) -> GoalCheck:
+        done = bool(dossier.final_review_packet) and not self.policy.require_ultimate_review and index >= self.policy.max_loops
+        rationale = "Goal still needs independent final review or more evidence."
+        if done:
+            rationale = "Done criteria and final review requirements are satisfied."
+        return GoalCheck(
+            question="Has the campaign goal been met?",
+            met=done,
+            evaluator=self.policy.second_model_evaluator,
+            rationale=rationale,
+        )
+
+    def _resume_state(self, dossier: ReviewDossier, requested_loops: int, completed_loops: int, stop_reason: str | None) -> dict[str, Any]:
+        return {
+            "saved": self.policy.save_resume_state,
+            "stop_reason": stop_reason,
+            "completed_loops": completed_loops,
+            "requested_loops": requested_loops,
+            "next_step": "resume_goal_loop",
+            "what_is_left": (
+                "Continue autonomous observe-plan-act-verify-review loops, run the goal satisfaction check again, "
+                "and submit the final packet to the independent final auditor."
+            ),
+            "campaign_objective": dossier.campaign.objective,
+        }
+
     def _select_dynamic_steps(self, workflow: tuple[WorkflowStep, ...], iteration: int) -> tuple[str, ...]:
         if iteration == 1:
             preferred = {"create_harness", "define_campaign", "employ_fleet", "plan", "research", "contract"}
@@ -232,7 +357,9 @@ class CampaignAutorun:
             preferred = {"research", "contract", "synthesize", "performance_review", "ultimate_review", "evolve"}
         return tuple(step.id for step in workflow if step.id in preferred or step.id.startswith("contract_"))
 
-    def _stop_reason(self, index: int, loop_count: int) -> str | None:
+    def _stop_reason(self, index: int, loop_count: int, goal_check: GoalCheck | None = None) -> str | None:
+        if goal_check and goal_check.met:
+            return "objective_satisfied"
         if self.policy.require_ultimate_review and index == loop_count:
             return "approval_required"
         return None

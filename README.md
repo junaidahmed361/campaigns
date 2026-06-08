@@ -161,8 +161,9 @@ print(dossier.to_dict()["workflow"])
 - `PerformanceReview`: scorecard scaffold for reviewing employed agents without micromanagement.
 - `ReviewDossier`: final artifact the user reviews before approving execution, accepting outcomes, or triggering another iteration.
 - `CampaignAutorun`: simple `fit` / `transform` / `score` / `autorun` primitive for bounded observe-plan-act-verify-review loops.
-- `AutorunPolicy` and `CampaignIteration`: loop limits, stop conditions, and iteration records for Claude-style dynamic workflows.
+- `AutorunPolicy`, `GoalCheck`, and `CampaignIteration`: `/goal`-style loop limits, stop conditions, second-model goal checks, independent final auditor hints, budget pause/resume state, and iteration records.
 - `RetrospectiveFeedback`: continual-learning feedback that routes reinforcement to either Campaigns-owned next-iteration strategy or AgentRL-owned agent harness lifecycle updates.
+- `CampaignAutorun.final_review(...)`: after the user gives final review, a retro agent traverses trace surfaces across all employed agents, attributes root cause, and plans AgentRL self-reinforcement for the relevant harness.
 
 SDK retro example:
 
