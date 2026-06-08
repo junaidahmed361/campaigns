@@ -162,6 +162,22 @@ print(dossier.to_dict()["workflow"])
 - `ReviewDossier`: final artifact the user reviews before approving execution, accepting outcomes, or triggering another iteration.
 - `CampaignAutorun`: simple `fit` / `transform` / `score` / `autorun` primitive for bounded observe-plan-act-verify-review loops.
 - `AutorunPolicy` and `CampaignIteration`: loop limits, stop conditions, and iteration records for Claude-style dynamic workflows.
+- `RetrospectiveFeedback`: continual-learning feedback that routes reinforcement to either Campaigns-owned next-iteration strategy or AgentRL-owned agent harness lifecycle updates.
+
+SDK retro example:
+
+```python
+from campaigns import CampaignAutorun
+
+runner = CampaignAutorun().fit(campaign)
+runner.autorun(max_loops=1)
+retro = runner.retro({
+    "summary": "The Market Researcher missed competitor pricing evidence.",
+    "attention_level": "agentrl",
+    "target": "Market Researcher",
+    "reinforce": "Require competitor price citations before recommendations.",
+})
+```
 
 ## Boundary
 
