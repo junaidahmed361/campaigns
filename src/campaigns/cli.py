@@ -12,6 +12,7 @@ from .models import CampaignSpec, OrganizationBlueprint
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="campaigns", description="Compile campaign goals into accountable AgentRL-powered organizations.")
+    parser.add_argument("--version", action="version", version="campaigns 0.1.0")
     sub = parser.add_subparsers(dest="command", required=True)
     compile_cmd = sub.add_parser("compile", help="Compile a campaign YAML file into a review dossier.")
     compile_cmd.add_argument("path", type=Path)

@@ -14,3 +14,19 @@ campaign:
     - no cold email
     - human approval for spend > $500
     - disclose AI-generated customer-facing content before publishing
+  employed_harnesses:
+    - agent_name: Market Researcher
+      role: market_researcher
+      objective: Research market demand, local competitors, customer segments, and campaign risks using RAG-grounded evidence
+      components:
+        - rag
+        - trace
+        - decision_log
+        - evaluation
+    - agent_name: RAG Analyst
+      role: rag_analyst
+      objective: Retrieve and synthesize evidence for campaign claims, citations, and assumptions
+      components:
+        - rag
+        - trace
+        - evaluation

@@ -1,6 +1,7 @@
 """Campaign operating-system primitives powered by AgentRL pod declarations."""
 
 from .models import (
+    AgentHarnessDefinition,
     AgentRLPodInstantiation,
     Budget,
     CampaignSpec,
@@ -8,13 +9,17 @@ from .models import (
     DecisionRecord,
     EmployedAgent,
     OrganizationBlueprint,
+    PerformanceReview,
     ReviewDossier,
     TeamBlueprint,
     Timeline,
+    TraceMonitor,
+    WorkflowStep,
 )
 from .compiler import CampaignCompiler
 
 __all__ = [
+    "AgentHarnessDefinition",
     "AgentRLPodInstantiation",
     "Budget",
     "CampaignCompiler",
@@ -23,7 +28,10 @@ __all__ = [
     "DecisionRecord",
     "EmployedAgent",
     "OrganizationBlueprint",
+    "PerformanceReview",
     "ReviewDossier",
     "TeamBlueprint",
     "Timeline",
+    "TraceMonitor",
+    "WorkflowStep",
 ]

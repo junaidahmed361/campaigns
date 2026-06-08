@@ -26,10 +26,10 @@ dependencies = ["PyYAML>=6.0"]
 
 [project.optional-dependencies]
 agentrl = ["agentrl-os>=0.1.0"]
-dev = ["pytest>=8.0", "build>=1.2.0"]
+dev = ["pytest>=8.0", "build>=1.2.0", "twine>=5.0"]
 
 [project.urls]
-Homepage = "https://github.com/junaidahmed361/campaigns"
+Homepage = "https://pypi.org/project/campaigns-os/"
 Repository = "https://github.com/junaidahmed361/campaigns"
 Issues = "https://github.com/junaidahmed361/campaigns/issues"
 Documentation = "https://github.com/junaidahmed361/campaigns#readme"

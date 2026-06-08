@@ -1,6 +1,12 @@
 # Campaigns
 
-Campaigns is an open-source swarm operating-system layer above AgentRL.
+[![PyPI version](https://badge.fury.io/py/campaigns-os.svg)](https://pypi.org/project/campaigns-os/)
+[![Python versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://pypi.org/project/campaigns-os/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/junaidahmed361/campaigns/blob/main/LICENSE)
+[![CI](https://github.com/junaidahmed361/campaigns/actions/workflows/ci.yml/badge.svg)](https://github.com/junaidahmed361/campaigns/actions/workflows/ci.yml)
+[![Package](https://github.com/junaidahmed361/campaigns/actions/workflows/package.yml/badge.svg)](https://github.com/junaidahmed361/campaigns/actions/workflows/package.yml)
+
+Campaigns is an open-source campaign operating-system layer above AgentRL.
 
 AgentRL answers:
 
@@ -14,47 +20,105 @@ Campaigns answers:
 How do we continuously execute a user's goal through an evolving autonomous organization?
 ```
 
-The core primitive is not a task or workflow. It is a campaign:
+The user does not micromanage every task. The user defines goals, reviews harnesses and approval gates, monitors traces when desired, and receives an ultimate final review packet across the fleet and contract agents.
+
+## Dynamic workflow
+
+```text
+1. User creates a targeted AgentRL harness
+   Example: Market Researcher with RAG, trace, decision-log, evaluation, memory, and approval-gate components.
+
+2. User defines a campaign
+   Example: run a marketing campaign using the Market Researcher and RAG Analyst harnesses.
+
+3. Campaigns employs those harnesses as fleet agents
+   Each employed agent has a mandate, decision rights, review obligations, and an AgentRL pod declaration.
+
+4. Fleet agents plan and execute bounded work
+   The Market Researcher runs RAG-grounded research. The Campaign Manager creates approval gates and operating cadence.
+
+5. Fleet agents contract short-term specialist workers in parallel
+   Example contracts: SEO Optimizer, Outreach Worker, Creative Worker, Analytics Worker.
+
+6. Contract agents return deliverables, traces, costs, and evidence
+   Employed agents remain accountable for synthesis and decisions.
+
+7. Campaigns synthesizes a final report
+   The user receives one final review packet across all fleet and contract agents instead of being forced to micromanage.
+
+8. User monitors traces and performance reviews when desired
+   Trace monitors expose decision quality, constraint compliance, contract outcomes, evidence quality, and cost/timeline drift.
+
+9. User performs ultimate review
+   Approve, revise, stop, or launch the next iteration.
+
+10. AgentRL consumes traces and review outcomes
+    Harnesses can evolve, be versioned, promoted, deployed, or rolled back.
+```
+
+## Campaign primitive
 
 ```yaml
 campaign:
-  objective: Increase recurring revenue
+  objective: Increase recurring revenue by 30% for a local detailing business
   budget:
     dollars: 5000
   timeline:
     days: 90
   metrics:
-    - revenue
-    - conversions
+    - recurring_revenue
+    - conversion_rate
   constraints:
-    - no cold email
     - human approval for spend > $500
+  employed_harnesses:
+    - agent_name: Market Researcher
+      role: market_researcher
+      objective: Research demand, competitors, segments, and campaign risks
+      components: [rag, trace, decision_log, evaluation]
+    - agent_name: RAG Analyst
+      role: rag_analyst
+      objective: Retrieve and synthesize evidence for claims and assumptions
+      components: [rag, trace, evaluation]
 ```
 
 A campaign turns a user goal into an accountable operating structure:
 
 ```text
 Campaign
+  -> Workflow DAG
   -> Organization
   -> Team
-  -> Employed Agent
+  -> Employed Fleet Agent
   -> AgentRL Pod Instantiation
   -> Runtime / Harness
-       -> Contracted Agents when work is outsourced
+       -> Contracted Agents for short-term parallel work
+  -> Trace Monitor
+  -> Performance Reviews
+  -> Ultimate User Review
+  -> AgentRL Evolution / Promotion / Rollback
 ```
 
-## Why this is separate from AgentRL
+## Install
 
-AgentRL should remain the harness lifecycle layer: definitions, evals, trajectories, self-evolution, versions, and deployment records for agent systems.
+From PyPI after release:
 
-Campaigns sits above it. It composes AgentRL-powered pods into autonomous organizations that pursue outcomes across domains like business, marketing, research, and software.
+```bash
+pip install campaigns-os
+```
 
-## Install locally
+From source:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .[dev]
+```
+
+Run from GitHub Container Registry after package publication:
+
+```bash
+docker pull ghcr.io/junaidahmed361/campaigns:latest
+docker run --rm ghcr.io/junaidahmed361/campaigns:latest --version
 ```
 
 ## Quick start
@@ -68,35 +132,39 @@ campaigns compile examples/revenue-growth.yaml
 Or from Python:
 
 ```python
-from campaigns import CampaignSpec, OrganizationBlueprint, CampaignCompiler
+from campaigns import CampaignSpec, CampaignCompiler
 
 spec = CampaignSpec.from_dict({
     "objective": "Increase recurring revenue",
-    "budget": {"dollars": 5000},
-    "timeline": {"days": 90},
     "metrics": ["revenue", "conversions"],
-    "constraints": ["no cold email", "human approval for spend > $500"],
+    "employed_harnesses": [{
+        "agent_name": "Market Researcher",
+        "role": "market_researcher",
+        "objective": "Research the market with RAG-grounded evidence",
+        "components": ["rag", "trace", "decision_log", "evaluation"],
+    }],
 })
 
-blueprint = OrganizationBlueprint.default_for(spec)
-dossier = CampaignCompiler().compile(spec, blueprint)
-print(dossier.to_dict())
+dossier = CampaignCompiler().compile(spec)
+print(dossier.to_dict()["workflow"])
 ```
 
 ## Current primitives
 
-- `CampaignSpec`: user-defined goal, budget, timeline, success metrics, and constraints.
-- `AgentRLPodInstantiation`: a portable declaration of an AgentRL pod used by a campaign.
-- `EmployedAgent`: an accountable campaign participant with a role, mandate, decision rights, and review obligations.
-- `Contract`: outsourced work from an employed agent to a contracted agent or external pod.
-- `OrganizationBlueprint`: org/team/agent layout generated from a campaign goal.
-- `DecisionRecord`: auditable decisions for ultimate human review.
-- `ReviewDossier`: the artifact a user reviews before approving execution or accepting outcomes.
+- `AgentHarnessDefinition`: campaign-side reference to a user-created targeted AgentRL harness.
+- `CampaignSpec`: user-defined goal, budget, timeline, success metrics, constraints, and employed harnesses.
+- `AgentRLPodInstantiation`: portable declaration of an AgentRL pod used by an employed or contract agent.
+- `EmployedAgent`: accountable fleet participant with role, mandate, decision rights, contracts, and review obligations.
+- `Contract`: outsourced short-term specialist work with success criteria, trace requirements, and a contracted pod.
+- `WorkflowStep`: DAG step for harness creation, campaign definition, fleet employment, contract work, synthesis, performance review, ultimate review, and AgentRL evolution.
+- `TraceMonitor`: user-monitorable trace surface for fleet performance reviews.
+- `PerformanceReview`: scorecard scaffold for reviewing employed agents without micromanagement.
+- `ReviewDossier`: final artifact the user reviews before approving execution, accepting outcomes, or triggering another iteration.
 
 ## Boundary
 
-Campaigns does not implement agent runtimes, model training, or harness evolution. It records which AgentRL pod should own those lifecycle responsibilities.
+Campaigns does not implement agent runtimes, model training, or harness evolution. It records which AgentRL pod should own those lifecycle responsibilities and how the campaign organization composes them.
 
 ## Sister commercial app
 
-The intended private sister repo is `campaigns-app`. It should provide hosted UI, billing, user workspaces, approvals, and commercial integrations while keeping these core campaign primitives open source.
+The private sister repo is `campaigns-app`. It provides the commercial interface around the open-source core: hosted UI, billing, user workspaces, approvals, trace/performance dashboards, and integrations.

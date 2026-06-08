@@ -15,11 +15,7 @@ class Budget:
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "Budget":
         data = data or {}
-        return cls(
-            dollars=data.get("dollars"),
-            compute_hours=data.get("compute_hours"),
-            human_hours=data.get("human_hours"),
-        )
+        return cls(dollars=data.get("dollars"), compute_hours=data.get("compute_hours"), human_hours=data.get("human_hours"))
 
 
 @dataclass(frozen=True)
@@ -36,8 +32,43 @@ class Timeline:
 
 
 @dataclass(frozen=True)
+class AgentHarnessDefinition:
+    """User-created targeted harness intent before a campaign employs the agent."""
+
+    agent_name: str
+    role: str
+    objective: str
+    components: tuple[str, ...] = ()
+    agentrl_project_path: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "AgentHarnessDefinition":
+        return cls(
+            agent_name=data["agent_name"],
+            role=data["role"],
+            objective=data["objective"],
+            components=tuple(data.get("components", ())),
+            agentrl_project_path=data.get("agentrl_project_path"),
+        )
+
+    def to_pod(self) -> "AgentRLPodInstantiation":
+        slug = _slug(self.agent_name)
+        return AgentRLPodInstantiation(
+            name=f"{self.agent_name} Pod",
+            domain=self.role,
+            project_path=self.agentrl_project_path or f"agentrl://targeted-agents/{slug}",
+            harness_entrypoint=f"{slug}-harness:run",
+            eval_suite=f"{slug}-evals",
+            harness_components=self.components,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class CampaignSpec:
-    """A user-defined outcome request."""
+    """A user-defined outcome request plus the initial employed harnesses."""
 
     objective: str
     budget: Budget = field(default_factory=Budget)
@@ -45,10 +76,12 @@ class CampaignSpec:
     metrics: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
     domain: str | None = None
+    employed_harnesses: tuple[AgentHarnessDefinition, ...] = ()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "CampaignSpec":
         payload = data.get("campaign", data)
+        harnesses = payload.get("employed_harnesses", payload.get("agents", ()))
         return cls(
             objective=payload["objective"],
             budget=Budget.from_dict(payload.get("budget")),
@@ -56,6 +89,7 @@ class CampaignSpec:
             metrics=tuple(payload.get("metrics", ())),
             constraints=tuple(payload.get("constraints", ())),
             domain=payload.get("domain"),
+            employed_harnesses=tuple(AgentHarnessDefinition.from_dict(item) for item in harnesses),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -64,7 +98,7 @@ class CampaignSpec:
 
 @dataclass(frozen=True)
 class AgentRLPodInstantiation:
-    """Declaration that an employed agent is backed by an AgentRL-managed pod."""
+    """Declaration that an employed or contract agent is backed by an AgentRL-managed pod."""
 
     name: str
     version: str = "0.1.0"
@@ -73,6 +107,7 @@ class AgentRLPodInstantiation:
     harness_entrypoint: str | None = None
     eval_suite: str | None = None
     deployment_channel: str = "local"
+    harness_components: tuple[str, ...] = ()
 
     def lifecycle_owner(self) -> str:
         return "agentrl"
@@ -83,14 +118,16 @@ class AgentRLPodInstantiation:
 
 @dataclass(frozen=True)
 class Contract:
-    """Outsourced work managed by an employed agent."""
+    """Outsourced short-term work managed by an employed fleet agent."""
 
     objective: str
     budget: Budget = field(default_factory=Budget)
     deadline: str | None = None
     success_criteria: tuple[str, ...] = ()
     trace_required: bool = True
+    parallelizable: bool = True
     contracted_pod: AgentRLPodInstantiation | None = None
+    status: str = "proposed"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -98,7 +135,7 @@ class Contract:
 
 @dataclass(frozen=True)
 class EmployedAgent:
-    """An accountable agent employed by a campaign goal."""
+    """An accountable fleet agent employed by a campaign goal."""
 
     name: str
     role: str
@@ -109,6 +146,7 @@ class EmployedAgent:
         "record material decisions",
         "surface uncertainty and tradeoffs",
         "provide traceable evidence for user review",
+        "summarize contracted-agent work instead of forcing user micromanagement",
     )
     contracts: tuple[Contract, ...] = ()
 
@@ -148,12 +186,50 @@ class OrganizationBlueprint:
     def default_for(cls, campaign: CampaignSpec) -> "OrganizationBlueprint":
         domain = (campaign.domain or campaign.objective).lower()
         if any(token in domain for token in ("revenue", "marketing", "growth", "sales", "business")):
-            teams = _growth_teams()
+            teams = _growth_teams(campaign)
         elif any(token in domain for token in ("software", "code", "app", "product")):
-            teams = _software_teams()
+            teams = _software_teams(campaign)
         else:
-            teams = _general_campaign_teams()
+            teams = _general_campaign_teams(campaign)
         return cls(name="Campaign Organization", teams=teams)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class WorkflowStep:
+    id: str
+    name: str
+    actor: str
+    kind: str
+    depends_on: tuple[str, ...] = ()
+    outputs: tuple[str, ...] = ()
+    review_surface: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class TraceMonitor:
+    """What the user can monitor without micromanaging the fleet."""
+
+    scope: str
+    trace_paths: tuple[str, ...]
+    review_cadence: str = "on-demand performance review"
+    signals: tuple[str, ...] = ("decision quality", "constraint compliance", "contract outcomes", "evidence quality", "cost and timeline drift")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PerformanceReview:
+    agent: str
+    scorecard: tuple[str, ...]
+    evidence: tuple[str, ...]
+    recommended_action: str = "continue with monitoring"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -178,79 +254,79 @@ class ReviewDossier:
 
     campaign: CampaignSpec
     organization: OrganizationBlueprint
+    workflow: tuple[WorkflowStep, ...]
     decisions: tuple[DecisionRecord, ...]
+    contracts: tuple[Contract, ...]
+    trace_monitor: TraceMonitor
+    performance_reviews: tuple[PerformanceReview, ...]
     approval_gates: tuple[str, ...]
+    final_review_packet: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
-def _pod(name: str, domain: str, eval_suite: str) -> AgentRLPodInstantiation:
-    slug = name.lower().replace(" ", "-")
+def _slug(value: str) -> str:
+    return "-".join("".join(ch.lower() if ch.isalnum() else " " for ch in value).split())
+
+
+def _pod(name: str, domain: str, eval_suite: str, components: tuple[str, ...] = ()) -> AgentRLPodInstantiation:
+    slug = _slug(name)
     return AgentRLPodInstantiation(
         name=name,
         domain=domain,
         project_path=f"agentrl://pods/{slug}",
         harness_entrypoint=f"{slug}:run",
         eval_suite=eval_suite,
+        harness_components=components,
     )
 
 
-def _agent(name: str, role: str, mandate: str, domain: str, eval_suite: str, rights: tuple[str, ...]) -> EmployedAgent:
-    return EmployedAgent(
-        name=name,
-        role=role,
-        mandate=mandate,
-        pod=_pod(name=f"{role} Pod", domain=domain, eval_suite=eval_suite),
-        decision_rights=rights,
+def _agent(name: str, role: str, mandate: str, domain: str, eval_suite: str, rights: tuple[str, ...], components: tuple[str, ...] = ()) -> EmployedAgent:
+    return EmployedAgent(name=name, role=role, mandate=mandate, pod=_pod(f"{role} Pod", domain, eval_suite, components), decision_rights=rights)
+
+
+def _harness_agents(campaign: CampaignSpec) -> tuple[EmployedAgent, ...]:
+    return tuple(
+        EmployedAgent(
+            name=h.agent_name,
+            role=h.role,
+            mandate=h.objective,
+            pod=h.to_pod(),
+            decision_rights=("perform assigned campaign work", "request bounded contracts", "produce evidence-backed recommendations"),
+        )
+        for h in campaign.employed_harnesses
     )
 
 
-def _growth_teams() -> tuple[TeamBlueprint, ...]:
+def _contract_agent(name: str, role: str, objective: str, success: tuple[str, ...]) -> Contract:
+    return Contract(
+        objective=objective,
+        success_criteria=success,
+        contracted_pod=_pod(f"{name} Contract Pod", role, f"{_slug(name)}-contract-evals", ("trace", "decision_log", "evaluation")),
+    )
+
+
+def _growth_teams(campaign: CampaignSpec) -> tuple[TeamBlueprint, ...]:
+    user_agents = _harness_agents(campaign)
+    researcher = user_agents or (
+        _agent("Market Researcher", "market_researcher", "Produce RAG-grounded market, competitor, and audience research.", "marketing", "market-research-evals", ("summarize evidence", "request contracts"), ("rag", "trace", "decision_log", "evaluation")),
+    )
+    manager = _agent("Campaign Manager", "manager", "Convert the user goal into strategy, operating cadence, contract boundaries, and approval gates.", "growth", "campaign-manager-evals", ("prioritize initiatives", "approve internal delegation", "request contracts"), ("trace", "decision_log", "evaluation", "approval_gate"))
+    acquisition = _agent("Acquisition Agent", "acquisition", "Plan SEO, paid, partner, outreach, and content experiments.", "marketing", "acquisition-evals", ("propose campaigns", "draft acquisition assets", "request contract workers"), ("tool_use", "trace", "approval_gate"))
+    acquisition = acquisition.outsource(_contract_agent("SEO Optimizer", "seo", "Optimize campaign pages and content briefs for qualified search demand.", ("keyword map delivered", "traceable recommendations", "no publishing without approval")))
+    acquisition = acquisition.outsource(_contract_agent("Outreach Worker", "outreach", "Draft compliant outreach and follow-up sequences for approved audiences.", ("sequence draft delivered", "constraint compliance", "human approval before sending")))
     return (
-        TeamBlueprint(
-            name="Growth Team",
-            mission="Find and operate the highest-leverage paths to measurable revenue growth.",
-            agents=(
-                _agent("Campaign Manager", "manager", "Convert the user goal into strategy, operating cadence, and approval gates.", "growth", "campaign-manager-evals", ("prioritize initiatives", "request contracts")),
-                _agent("Acquisition Agent", "acquisition", "Plan SEO, paid, partner, and content acquisition experiments.", "marketing", "acquisition-evals", ("propose campaigns", "draft acquisition assets")),
-                _agent("Analytics Agent", "analytics", "Define metrics, instrumentation, forecasts, and experiment readouts.", "analytics", "analytics-evals", ("select metrics", "flag invalid measurements")),
-            ),
-        ),
-        TeamBlueprint(
-            name="Conversion Team",
-            mission="Improve landing pages, offers, onboarding, and retention loops.",
-            agents=(
-                _agent("Conversion Agent", "conversion", "Generate and evaluate funnel improvements.", "growth", "conversion-evals", ("draft landing page changes", "propose funnel experiments")),
-                _agent("Retention Agent", "retention", "Design follow-up, upsell, and retention plays within constraints.", "customer-success", "retention-evals", ("propose retention sequences",)),
-            ),
-        ),
+        TeamBlueprint("Campaign Management Team", "Own the goal, campaign plan, fleet accountability, and final user review packet.", (manager,)),
+        TeamBlueprint("Research Team", "Ground campaign choices in retrieved evidence and market analysis.", researcher),
+        TeamBlueprint("Growth Execution Team", "Run acquisition experiments through employed agents and short-term contract workers.", (acquisition,)),
+        TeamBlueprint("Measurement Team", "Monitor traces, metrics, and fleet performance reviews.", (_agent("Analytics Agent", "analytics", "Define metrics, instrumentation, forecasts, and performance readouts.", "analytics", "analytics-evals", ("select metrics", "flag invalid measurements", "run performance reviews"), ("trace", "evaluation", "decision_log")),)),
     )
 
 
-def _software_teams() -> tuple[TeamBlueprint, ...]:
-    return (
-        TeamBlueprint(
-            name="Product Engineering Team",
-            mission="Turn outcome goals into software milestones, implementation, validation, and deployment evidence.",
-            agents=(
-                _agent("Product Agent", "product", "Translate campaign objectives into product bets and acceptance criteria.", "product", "product-evals", ("prioritize features",)),
-                _agent("Engineering Agent", "engineering", "Build and verify scoped software increments.", "software", "engineering-evals", ("modify code", "run tests")),
-                _agent("QA Agent", "qa", "Audit behavior, regressions, and release risk.", "quality", "qa-evals", ("block risky releases",)),
-            ),
-        ),
-    )
+def _software_teams(campaign: CampaignSpec) -> tuple[TeamBlueprint, ...]:
+    return (TeamBlueprint("Product Engineering Team", "Turn outcome goals into software milestones, implementation, validation, and deployment evidence.", _harness_agents(campaign) or (_agent("Product Agent", "product", "Translate campaign objectives into product bets and acceptance criteria.", "product", "product-evals", ("prioritize features",), ("trace", "evaluation")), _agent("Engineering Agent", "engineering", "Build and verify scoped software increments.", "software", "engineering-evals", ("modify code", "run tests"), ("tool_use", "trace", "evaluation")), _agent("QA Agent", "qa", "Audit behavior, regressions, and release risk.", "quality", "qa-evals", ("block risky releases",), ("trace", "evaluation")))),)
 
 
-def _general_campaign_teams() -> tuple[TeamBlueprint, ...]:
-    return (
-        TeamBlueprint(
-            name="Strategy Team",
-            mission="Decompose the campaign into measurable workstreams and managed risks.",
-            agents=(
-                _agent("Campaign Manager", "manager", "Own campaign operating plan and review cadence.", "general", "manager-evals", ("prioritize initiatives", "request contracts")),
-                _agent("Research Agent", "research", "Gather evidence, options, and risk signals for campaign decisions.", "research", "research-evals", ("summarize evidence", "recommend options")),
-                _agent("Operations Agent", "operations", "Coordinate execution steps and status reporting.", "operations", "operations-evals", ("assign tasks", "track execution")),
-            ),
-        ),
-    )
+def _general_campaign_teams(campaign: CampaignSpec) -> tuple[TeamBlueprint, ...]:
+    return (TeamBlueprint("Strategy Team", "Decompose the campaign into measurable workstreams and managed risks.", _harness_agents(campaign) or (_agent("Campaign Manager", "manager", "Own campaign operating plan and review cadence.", "general", "manager-evals", ("prioritize initiatives", "request contracts"), ("trace", "decision_log")), _agent("Research Agent", "research", "Gather evidence, options, and risk signals for campaign decisions.", "research", "research-evals", ("summarize evidence", "recommend options"), ("rag", "trace")), _agent("Operations Agent", "operations", "Coordinate execution steps and status reporting.", "operations", "operations-evals", ("assign tasks", "track execution"), ("trace", "evaluation")))),)
