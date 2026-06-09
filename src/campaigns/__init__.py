@@ -13,6 +13,7 @@ from .autorun import (
 from .models import (
     AgentHarnessDefinition,
     AgentRLPodInstantiation,
+    ArchitectureLayer,
     Budget,
     CampaignSpec,
     Contract,
@@ -25,6 +26,8 @@ from .models import (
     Timeline,
     TraceMonitor,
     WorkflowStep,
+    WorldModelScenario,
+    default_architecture_layers,
 )
 from .compiler import CampaignCompiler
 
@@ -39,6 +42,7 @@ __all__ = [
     "RetrospectiveResult",
     "AgentHarnessDefinition",
     "AgentRLPodInstantiation",
+    "ArchitectureLayer",
     "Budget",
     "CampaignCompiler",
     "CampaignSpec",
@@ -52,4 +56,6 @@ __all__ = [
     "Timeline",
     "TraceMonitor",
     "WorkflowStep",
+    "WorldModelScenario",
+    "default_architecture_layers",
 ]

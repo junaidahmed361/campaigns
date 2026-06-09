@@ -9,6 +9,8 @@ from .models import (
     ReviewDossier,
     TraceMonitor,
     WorkflowStep,
+    WorldModelScenario,
+    default_architecture_layers,
 )
 
 
@@ -19,6 +21,8 @@ class CampaignCompiler:
         organization = organization or OrganizationBlueprint.default_for(campaign)
         contracts = self._contracts(organization)
         decisions = self._initial_decisions(campaign, organization, contracts)
+        simulated_futures = self._simulated_futures(campaign)
+        selected_future = simulated_futures[0]
         workflow = self._workflow(campaign, contracts)
         approval_gates = tuple(c for c in campaign.constraints if "approval" in c.lower())
         if not approval_gates:
@@ -33,7 +37,7 @@ class CampaignCompiler:
             "risks, unresolved questions, and approval requests",
             "recommended next campaign iteration",
         )
-        return ReviewDossier(campaign, organization, workflow, decisions, contracts, trace_monitor, performance_reviews, approval_gates, final_review_packet)
+        return ReviewDossier(campaign, default_architecture_layers(), organization, simulated_futures, selected_future, workflow, decisions, contracts, trace_monitor, performance_reviews, approval_gates, final_review_packet)
 
     def _contracts(self, organization: OrganizationBlueprint) -> tuple[Contract, ...]:
         return tuple(contract for team in organization.teams for agent in team.agents for contract in agent.contracts)
@@ -55,6 +59,37 @@ class CampaignCompiler:
             WorkflowStep("performance_review", "Monitor traces and produce fleet-agent performance reviews", "Analytics Agent", "monitoring", depends_on=("synthesize",), outputs=("performance scorecards", "trace anomalies", "improvement recommendations"), review_surface="performance review dashboard"),
             WorkflowStep("ultimate_review", "Present final review packet instead of micromanagement steps", "user", "human_review", depends_on=("performance_review",), outputs=("approve", "revise", "stop", "launch next iteration"), review_surface="ultimate user review"),
             WorkflowStep("evolve", "Feed review and trace outcomes back into AgentRL lifecycle", "AgentRL", "lifecycle", depends_on=("ultimate_review",), outputs=("candidate harness improvements", "versions", "deployment/rollback records"), review_surface="AgentRL promotion gate"),
+        )
+
+    def _simulated_futures(self, campaign: CampaignSpec) -> tuple[WorldModelScenario, ...]:
+        metrics = campaign.metrics or ("primary outcome metric",)
+        budget = f"within ${campaign.budget.dollars:g}" if campaign.budget.dollars is not None else "within approved budget"
+        timeline = f"over {campaign.timeline.days} days" if campaign.timeline.days is not None else "within campaign timeline"
+        return (
+            WorldModelScenario(
+                "Balanced Growth Future",
+                "Coordinate research, acquisition, measurement, and approval-gated execution before scaling spend.",
+                tuple(f"steady improvement in {metric}" for metric in metrics),
+                budget,
+                "medium: slower than an aggressive push, but preserves evidence quality and approval control",
+                f"Best default for outcome campaigns because it optimizes cost, risk, and metric learning {timeline}.",
+            ),
+            WorldModelScenario(
+                "Aggressive Acquisition Future",
+                "Prioritize paid, partner, and content experiments in parallel with tighter review cadence.",
+                tuple(f"faster movement in {metric}" for metric in metrics),
+                "higher front-loaded spend and contract load",
+                "high: faster execution can outrun evidence, approvals, or constraint checks",
+                "Useful when speed matters more than spend efficiency, but should require stricter human gates.",
+            ),
+            WorldModelScenario(
+                "Evidence-First Future",
+                "Delay broad execution until research, world-model assumptions, and instrumentation are validated.",
+                tuple(f"higher-confidence readout for {metric}" for metric in metrics),
+                "lower initial spend, more analysis time",
+                "low-to-medium: reduced execution risk with opportunity-cost risk",
+                "Useful when the campaign has uncertain customers, channels, constraints, or measurement quality.",
+            ),
         )
 
     def _initial_decisions(self, campaign: CampaignSpec, organization: OrganizationBlueprint, contracts: tuple[Contract, ...]) -> tuple[DecisionRecord, ...]:

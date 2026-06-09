@@ -76,3 +76,38 @@ def test_workflow_contract_steps_are_parallel_after_contract_phase():
     assert all(step.depends_on == ("contract",) for step in contract_steps)
     synthesize = next(step for step in dossier.workflow if step.id == "synthesize")
     assert all(step.id in synthesize.depends_on for step in contract_steps)
+
+
+def test_compiler_preserves_layer_boundary_above_agentrl():
+    campaign = CampaignSpec.from_dict({"objective": "Grow my detailing business", "metrics": ["recurring_revenue"]})
+
+    dossier = CampaignCompiler().compile(campaign)
+
+    layers = {layer.name: layer for layer in dossier.architecture_layers}
+    assert layers["Runtime"].output == "Trajectory"
+    assert layers["Harness Lifecycle"].owner == "AgentRL"
+    assert layers["Swarm Operating System"].owner == "Campaigns"
+    assert layers["Swarm Operating System"].output == "Campaign outcome"
+    assert any(decision.agent == "Campaign Manager" for decision in dossier.decisions)
+
+
+def test_compiler_generates_world_model_futures_before_execution():
+    campaign = CampaignSpec.from_dict(
+        {
+            "objective": "Increase recurring revenue by 30% for a local detailing business",
+            "budget": {"dollars": 5000},
+            "timeline": {"days": 90},
+            "metrics": ["recurring_revenue", "conversion_rate"],
+        }
+    )
+
+    dossier = CampaignCompiler().compile(campaign)
+
+    assert [future.name for future in dossier.simulated_futures] == [
+        "Balanced Growth Future",
+        "Aggressive Acquisition Future",
+        "Evidence-First Future",
+    ]
+    assert dossier.selected_future == dossier.simulated_futures[0]
+    assert dossier.selected_future.expected_cost == "within $5000"
+    assert "steady improvement in recurring_revenue" in dossier.selected_future.expected_metrics

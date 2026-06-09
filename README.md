@@ -8,6 +8,31 @@
 
 Campaigns is an open-source campaign operating-system layer above AgentRL.
 
+The design is inspired by multi-agent economies such as Qi et al., "Economy of Minds: Emerging Multi-Agent Intelligence with Economic Interactions" (2026), https://arxiv.org/pdf/2606.02859, especially the idea that capable agent societies need explicit interaction protocols, resource constraints, specialization, and outcome-oriented coordination rather than a flat task list.
+
+## Architectural layer boundary
+
+Campaigns intentionally models the layer above AgentRL:
+
+```text
+Layer 1: Runtime
+  Question: How does one agent solve a task?
+  Output: Trajectory
+  Examples: Claude Code, OpenHarness, OpenHands, Codex, OpenCode
+
+Layer 2: Harness Lifecycle
+  Question: How do we improve, evaluate, evolve, version, and deploy agents?
+  Output: Improved Agent System
+  Owner: AgentRL
+
+Layer 3: Swarm Operating System
+  Question: How do we continuously execute business objectives through evolving agent organizations?
+  Output: Campaign Outcome
+  Owner: Campaigns
+```
+
+AgentRL powers Campaigns through deployable pods; Campaigns should not absorb AgentRL's lifecycle responsibilities.
+
 AgentRL answers:
 
 ```text
@@ -153,6 +178,8 @@ print(dossier.to_dict()["workflow"])
 
 - `AgentHarnessDefinition`: campaign-side reference to a user-created targeted AgentRL harness.
 - `CampaignSpec`: user-defined goal, budget, timeline, success metrics, constraints, and employed harnesses.
+- `ArchitectureLayer`: explicit Runtime / Harness Lifecycle / Swarm Operating System boundary so Campaigns stays above AgentRL.
+- `WorldModelScenario`: simulated future with expected metrics, cost, risk, and rationale before execution.
 - `AgentRLPodInstantiation`: portable declaration of an AgentRL pod used by an employed or contract agent.
 - `EmployedAgent`: accountable fleet participant with role, mandate, decision rights, contracts, and review obligations.
 - `Contract`: outsourced short-term specialist work with success criteria, trace requirements, and a contracted pod.

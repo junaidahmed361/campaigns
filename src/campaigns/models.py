@@ -5,6 +5,20 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+class ArchitectureLayer:
+    """Boundary marker for Campaigns as an operating-system layer above AgentRL."""
+
+    level: int
+    name: str
+    question: str
+    output: str
+    owner: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class Budget:
     """Resource limits for a campaign or outsourced contract."""
 
@@ -91,6 +105,21 @@ class CampaignSpec:
             domain=payload.get("domain"),
             employed_harnesses=tuple(AgentHarnessDefinition.from_dict(item) for item in harnesses),
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class WorldModelScenario:
+    """A simulated future considered before campaign execution."""
+
+    name: str
+    strategy: str
+    expected_metrics: tuple[str, ...]
+    expected_cost: str
+    expected_risk: str
+    rationale: str
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -253,7 +282,10 @@ class ReviewDossier:
     """The user-facing artifact for ultimate campaign review."""
 
     campaign: CampaignSpec
+    architecture_layers: tuple[ArchitectureLayer, ...]
     organization: OrganizationBlueprint
+    simulated_futures: tuple[WorldModelScenario, ...]
+    selected_future: WorldModelScenario
     workflow: tuple[WorkflowStep, ...]
     decisions: tuple[DecisionRecord, ...]
     contracts: tuple[Contract, ...]
@@ -268,6 +300,14 @@ class ReviewDossier:
 
 def _slug(value: str) -> str:
     return "-".join("".join(ch.lower() if ch.isalnum() else " " for ch in value).split())
+
+
+def default_architecture_layers() -> tuple[ArchitectureLayer, ...]:
+    return (
+        ArchitectureLayer(1, "Runtime", "How does one agent solve a task?", "Trajectory", "OpenHarness / Claude Code / Codex / other runtimes"),
+        ArchitectureLayer(2, "Harness Lifecycle", "How do we improve, evaluate, evolve, version, and deploy agents?", "Improved agent system", "AgentRL"),
+        ArchitectureLayer(3, "Swarm Operating System", "How do we continuously execute business objectives through evolving agent organizations?", "Campaign outcome", "Campaigns"),
+    )
 
 
 def _pod(name: str, domain: str, eval_suite: str, components: tuple[str, ...] = ()) -> AgentRLPodInstantiation:
