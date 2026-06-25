@@ -1,0 +1,18 @@
+# Product Vision & Product Thesis
+
+AgentOS packages the Campaign Kernel into a product that turns user outcomes, budgets, SLAs, constraints, and quality requirements into evaluated artifacts. The repository remains `campaigns` / Campaign Kernel: the reusable control-plane core, not a monolithic `agentos` app.
+
+## Boundary rules
+
+- Strengthen architectural boundaries before adding functionality.
+- Keep the core flow: Goal -> Campaign Kernel -> Capability -> Implementation -> Evaluation -> Artifact.
+- Providers are interchangeable device drivers behind implementations.
+- LangGraph is runtime/checkpoints/streaming only; it is not the system of record.
+- Hermes, dashboards, SDKs, and MCP clients are clients, not databases.
+
+## Phase 0 implications
+
+- Define contracts and evaluators before expanding execution features.
+- Emit measurable artifacts and immutable receipts for every material decision.
+- Prefer relational state; use vectors only for semantic retrieval needs.
+- Track Expected User Value per Dollar and Cost of Quality where routing or repair decisions are made.

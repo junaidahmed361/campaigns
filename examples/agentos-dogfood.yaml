@@ -1,0 +1,37 @@
+agentos:
+  goal: Ship an evaluated backend API for immutable campaign receipts
+  execution_policy:
+    name: local-byok-default
+    per_campaign_limit_usd: 25
+    per_work_unit_limit_usd: 2.5
+    prefer_subscription_providers: true
+    prefer_local: true
+    max_repair_iterations: 2
+    provider_rules:
+      claude_code:
+        enabled: true
+        pricing_model: subscription
+        marginal_cost_usd: 0
+      codex:
+        enabled: true
+        pricing_model: subscription
+        marginal_cost_usd: 0
+      ollama:
+        enabled: true
+        pricing_model: local
+        marginal_cost_usd: 0
+      openai_api:
+        enabled: false
+        pricing_model: token_api
+  sla: same-day dogfood smoke
+  constraints:
+    - no payment wallet in the open-source core
+    - no API keys supplied to AgentOS
+    - provider choice must stay hidden behind CLI drivers
+    - Hermes is a thin client over MCP or REST
+    - Campaign Kernel is the system of record
+  quality_requirements:
+    - Resource Manager reservation is recorded
+    - provider response artifact is captured
+    - every artifact has measurable acceptance checks
+    - immutable receipt is produced

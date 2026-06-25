@@ -30,6 +30,24 @@ from .models import (
     default_architecture_layers,
 )
 from .compiler import CampaignCompiler
+from .dogfood import AgentOSArtifact, AgentOSDogfoodResult, AgentOSDogfoodRunner, OutcomeRequest
+from .dogfood_exec import DogfoodExecutionResult, DogfoodExecutionRunner
+from .cli_driver import CliAuthDriver, CliDriverResponse
+from .resource_manager import BudgetReservation, ExecutionPolicy, FixedWallet, ResourceManager, ResourceReservation
+from .hermes_adapter import HermesAdapter
+from .mcp_server import AgentOSMCPServer
+from .architecture import (
+    IMMUTABLE_LAWS,
+    ArtifactSpec,
+    CapabilityContract,
+    CapabilityImplementation,
+    CostOfQualitySample,
+    EvaluationSpec,
+    ImmutableReceipt,
+    RoutingObjective,
+    phase0_artifact_specs,
+    phase0_capability_contracts,
+)
 
 __all__ = [
     "AutorunPolicy",
@@ -58,4 +76,29 @@ __all__ = [
     "WorkflowStep",
     "WorldModelScenario",
     "default_architecture_layers",
+    "IMMUTABLE_LAWS",
+    "ArtifactSpec",
+    "CapabilityContract",
+    "CapabilityImplementation",
+    "CostOfQualitySample",
+    "EvaluationSpec",
+    "ImmutableReceipt",
+    "RoutingObjective",
+    "phase0_artifact_specs",
+    "phase0_capability_contracts",
+    "AgentOSArtifact",
+    "AgentOSDogfoodResult",
+    "AgentOSDogfoodRunner",
+    "OutcomeRequest",
+    "DogfoodExecutionResult",
+    "DogfoodExecutionRunner",
+    "CliAuthDriver",
+    "CliDriverResponse",
+    "BudgetReservation",
+    "ExecutionPolicy",
+    "FixedWallet",
+    "ResourceManager",
+    "ResourceReservation",
+    "HermesAdapter",
+    "AgentOSMCPServer",
 ]

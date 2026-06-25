@@ -82,3 +82,26 @@ The private `campaigns-app` repo should own hosted and commercial surfaces:
 - commercial integrations
 
 The OSS repo should remain the reusable primitive layer.
+
+## AgentOS revised platform philosophy
+
+Campaigns is the Campaign Kernel: the reusable control plane that AgentOS packages with dashboard, SDK, MCP, documentation, and provider drivers. The core abstraction is not an agent class; it is a capability contract that produces measurable artifacts and immutable receipts.
+
+```text
+Goal
+  -> Campaign Kernel
+  -> Capability
+  -> Implementation
+  -> Evaluation
+  -> Artifact
+```
+
+Three immutable laws:
+
+1. The user specifies outcomes, never implementations.
+2. Every decision made by AgentOS must be explainable and reproducible.
+3. Every artifact must be measurable before it is accepted.
+
+LangGraph owns execution/checkpointing/streaming only. Campaign Kernel owns campaign state, capability contracts, budget reservations, credentials, artifacts, evaluations, receipts, events, and routing rationale.
+
+See [`docs/agentos`](docs/agentos/README.md) and [`docs/adr`](docs/adr/README.md).
