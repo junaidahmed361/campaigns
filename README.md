@@ -6,7 +6,15 @@
 [![CI](https://github.com/junaidahmed361/campaigns/actions/workflows/ci.yml/badge.svg)](https://github.com/junaidahmed361/campaigns/actions/workflows/ci.yml)
 [![Package](https://github.com/junaidahmed361/campaigns/actions/workflows/package.yml/badge.svg)](https://github.com/junaidahmed361/campaigns/actions/workflows/package.yml)
 
-Campaigns is an open-source campaign operating-system layer above AgentRL.
+Campaigns is the open-source **Campaign Kernel** for AgentOS: a capability-driven control plane where a user expresses an outcome, execution policy, SLA, resource ceiling, and quality requirements, and the system plans, routes, executes, evaluates, repairs, and returns measurable artifacts without exposing provider complexity.
+
+The product philosophy is deliberately not `Goal -> Planner -> Agent -> Tool`. It is:
+
+```text
+Goal -> Campaign Kernel -> Capability -> Implementation -> Evaluation -> Artifact
+```
+
+Providers such as Claude Code, Codex, Ollama, OpenAI, or Anthropic are interchangeable driver details behind capability implementations. Hermes is the primary Phase 0 dogfooding interface, but it is only a thin client/tool consumer over the AgentOS MCP server or REST API. Campaign Kernel remains the system of record.
 
 The design is inspired by multi-agent economies such as Qi et al., "Economy of Minds: Emerging Multi-Agent Intelligence with Economic Interactions" (2026), https://arxiv.org/pdf/2606.02859, especially the idea that capable agent societies need explicit interaction protocols, resource constraints, specialization, and outcome-oriented coordination rather than a flat task list.
 
@@ -123,6 +131,19 @@ Campaign
   -> AgentRL Evolution / Promotion / Rollback
 ```
 
+
+## AgentOS architecture repository
+
+This repository is now treated as the **Campaign Kernel** seed for AgentOS, not as a monolithic `agentos` repo. The canonical architecture source lives in [`docs/agentos`](docs/agentos/README.md), with the user-amended v3 architecture package in [`docs/agentos/v3`](docs/agentos/v3/README.md) and ADRs in [`docs/adr`](docs/adr/README.md).
+
+The non-negotiable product philosophy is:
+
+```text
+Goal -> Campaign Kernel -> Capability -> Implementation -> Evaluation -> Artifact
+```
+
+Providers are interchangeable device drivers. LangGraph is only the execution runtime. Hermes, dashboards, SDKs, and MCP clients are clients/facades, never the system of record. Phase 0 dogfooding should happen primarily through Hermes consuming the AgentOS MCP server or REST API.
+
 ## Install
 
 From PyPI after release:
@@ -147,6 +168,61 @@ docker run --rm ghcr.io/junaidahmed361/campaigns:latest --version
 ```
 
 ## Quick start
+
+### 1. Express the outcome, not the provider
+
+```bash
+campaigns dogfood \
+  --goal "Ship an evaluated backend API for campaign receipts" \
+  --budget 25 \
+  --constraint "immutable receipts" \
+  --quality "tests pass" \
+  --quality "receipt provenance is replayable"
+```
+
+This accepts only user-facing intent — goal, budget, constraints, quality requirements, and optional SLA — then returns selected capability contracts, measurable artifacts, evaluation gates, an EUV/$ routing objective, and an immutable receipt. Provider complexity stays behind drivers.
+
+### 2. Dogfood execution with Resource Manager reservations and local CLI auth
+
+Phase 0 can dogfood without Stripe, Apple Pay, invoices, or payment-wallet plumbing. `dogfood-exec` uses the open-source Resource Manager to reserve dollars from an execution policy, then invokes a local CLI driver through existing Claude/Codex auth configuration. AgentOS does not read or modify auth files and does not receive API keys.
+
+```bash
+campaigns dogfood-exec \
+  --goal "Ship an evaluated backend API for immutable campaign receipts" \
+  --budget 25 \
+  --reserve 2.50 \
+  --constraint "no payment wallet in the open-source core" \
+  --constraint "provider choice stays hidden behind CLI drivers" \
+  --quality "provider response artifact is captured" \
+  --quality "immutable receipt is produced"
+```
+
+For developer diagnostics only, you may force a driver:
+
+```bash
+campaigns dogfood-exec --driver codex ...
+campaigns dogfood-exec --driver claude ...
+```
+
+Normal product use should omit `--driver`; routing should select a capability implementation without asking the user to think about providers.
+
+### 3. Expose AgentOS to Hermes through MCP
+
+Hermes is the primary Phase 0 dogfooding interface, but it remains a thin client. The package exposes a minimal MCP-style stdio server scaffold:
+
+```bash
+agentos-mcp
+```
+
+The server publishes the Phase 0 Hermes tools:
+
+```text
+create_campaign, list_campaigns, campaign_status, approve, reject,
+list_artifacts, open_artifact, receipt,
+execution_policy_get, execution_policy_update
+```
+
+Campaign Kernel owns the state and business logic behind those tools.
 
 Create a review dossier from an example campaign:
 
@@ -176,6 +252,8 @@ print(dossier.to_dict()["workflow"])
 
 ## Current primitives
 
+- `ResourceManager`, `ExecutionPolicy`, and `ResourceReservation`: open-source resource ceilings/reservations for BYOK, subscription, token API, and local providers without payment-wallet logic.
+- `HermesAdapter` and `AgentOSMCPServer`: thin Phase 0 Hermes dogfooding surface over Campaign Kernel state; Hermes remains a client, not the system of record.
 - `AgentHarnessDefinition`: campaign-side reference to a user-created targeted AgentRL harness.
 - `CampaignSpec`: user-defined goal, budget, timeline, success metrics, constraints, and employed harnesses.
 - `ArchitectureLayer`: explicit Runtime / Harness Lifecycle / Swarm Operating System boundary so Campaigns stays above AgentRL.
